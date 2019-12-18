@@ -21,6 +21,7 @@ def get_menu_buttons_definition():
 
     return ['Премии', 'Задания', 'Штрафы']
 
+
 def get_user_step(uid):
     if uid in user_step:
         return user_step[uid]
