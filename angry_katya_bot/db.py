@@ -11,6 +11,8 @@ class User(Document):
     fine_count = IntField(default=0)
     award_count = IntField(default=0)
     task_count = IntField(default=0)
+    step = StringField(default='0')
+    admin = BooleanField(default=False)
 
     def add_fine(self, text):
 
@@ -45,12 +47,23 @@ class User(Document):
 
         Task(**task_obj).save()
 
+    def make_admin(self):
+
+        if not self.admin:
+            self.update(admin=True)
+
+        else:
+            self.update(admin=False)
+
+    def is_admin(self):
+        return self.admin
+
 
 class Fine(Document):
     content = StringField()
     owner = ReferenceField(User)
 
-    def delete_fine(self):
+    def erase(self):
 
         User.objects(id=self.owner.id).update(dec__fine_count=1)
         self.delete()
@@ -60,7 +73,7 @@ class Award(Document):
     content = StringField()
     owner = ReferenceField(User)
 
-    def delete_award(self):
+    def erase(self):
 
         User.objects(id=self.owner.id).update(dec__award_count=1)
         self.delete()
@@ -70,10 +83,32 @@ class Task(Document):
     content = StringField()
     owner = ReferenceField(User)
 
-    def delete_task(self):
+    def erase(self):
 
         User.objects(id=self.owner.id).update(dec__task_count=1)
         self.delete()
+
+
+class AdminMessage(Document):
+
+    category = StringField()
+    user = ReferenceField(User)
+    status = StringField()
+    text = StringField()
+    original_text = StringField()
+
+    def create_message(self, category, user, status, text, original_text):
+
+        message_obj = {
+            'category': category,
+            'user': User.objects(usr_id=user).get(),
+            'status': status,
+            'text': text,
+            'original_text': original_text
+        }
+
+        AdminMessage(**message_obj).save()
+
 
 
 # user_dict = {
@@ -107,3 +142,4 @@ class Task(Document):
 # text =
 
 # print(award[1])
+

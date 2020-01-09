@@ -67,7 +67,6 @@ def login(call):
         # buttons = [InlineKeyboardButton(f'{b}', callback_data=str(b)) for b in ['Премии', 'Задания', 'Штрафы']]
         # keyboard.add(*buttons)
 
-
         bot.send_message(call.message.chat.id, 'MENU', reply_markup=keyboard)
 
         user_step[call.message.chat.id] = 1
@@ -139,7 +138,7 @@ def logic(call):
 
         task_icon = [f'\N{pouting face}' if x < count else f'\N{angry face}' for x in range(7)]
 
-        keyboard = InlineKB().generate_kb(**{f'fine-{b}': f'{b + 1}' for b in range(count)}, *{''})
+        keyboard = InlineKB().generate_kb(**{f'fine-{b}': f'{b + 1}' for b in range(count)})
 
         bot.send_message(call.message.chat.id, f'Ваши штрафы: \n'
                                                f'          {"".join(task_icon)} \n'
@@ -150,6 +149,7 @@ def logic(call):
 
 @bot.callback_query_handler(func=lambda call: get_user_step(call.message.chat.id) == 'award')
 def award_content(call):
+    print('award')
 
     keyboard = InlineKB().generate_kb(**{'Премии': '<-- Назад <--'})
 
@@ -162,6 +162,7 @@ def award_content(call):
 
 @bot.callback_query_handler(func=lambda call: get_user_step(call.message.chat.id) == 'fine')
 def fine_content(call):
+    print('fine')
 
     fine_info = db.Fine.objects(owner=db.User.objects(usr_id=call.message.chat.id).get())[int(call.data.split('-')[-1])]
     bot.send_message(call.message.chat.id, f'Информация: \n'
@@ -170,12 +171,11 @@ def fine_content(call):
 
 @bot.callback_query_handler(func=lambda call: get_user_step(call.message.chat.id) == 'task')
 def task_content(call):
+    print('award')
+
     task_info = db.Task.objects(owner=db.User.objects(usr_id=call.message.chat.id).get())[int(call.data.split('-')[-1])]
     bot.send_message(call.message.chat.id, f'Информация: \n'
                                            f'{task_info.content} \n')
 
 
 bot.polling(none_stop=True)
-
-
-# print(get_user_in_db())
