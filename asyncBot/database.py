@@ -57,7 +57,8 @@ class Clients(Document):
     name = StringField(required=True)
     phone = StringField()
     birthday = DateTimeField()
-    client_sizes = StringField()
+    employee = StringField()
+    size = StringField()
 
 
 # user_dict = {

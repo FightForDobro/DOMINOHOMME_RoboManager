@@ -308,7 +308,11 @@ def get_birthdays():
 
     birthday_boys = []
     for client in db.Clients.objects():
-        if client.brithday.month == datetime.now().date().month and client.brithday.day == datetime.now().day:
+
+        if client.birthday == 'нет':
+            continue
+
+        elif client.birthday.month == datetime.now().date().month and client.birthday.day == datetime.now().day:
             birthday_boys.append(f'{client.name}: {client.phone}\n')
 
     if not birthday_boys:
