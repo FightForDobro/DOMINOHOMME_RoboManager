@@ -7,11 +7,11 @@ connect('angrykaty')
 class User(Document):
 
     usr_id = IntField(unique=True, required=True)
-    name = StringField(max_length=64, required=True,unique=True)
+    chat_id = IntField(required=True)
+    name = StringField(max_length=64, required=True, unique=True)
     fine_count = IntField(default=0)
     award_count = IntField(default=0)
     task_count = IntField(default=0)
-    step = StringField(default='0')
     admin = BooleanField(default=False)
 
     def add_fine(self, text):

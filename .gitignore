@@ -6,3 +6,9 @@ angry_katya_bot/.idea/
 angry_katya_bot/venv/
 
 .idea/
+
+asyncBot/venv/lib/python3.8/site-packages/aiogram/utils/__pycache__/
+
+asyncBot/__pycache__/
+
+asyncBot/venv/
