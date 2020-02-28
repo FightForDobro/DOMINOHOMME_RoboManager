@@ -1,5 +1,5 @@
 from mongoengine import *
-from datetime import datetime
+from bot_exceptions import FatalException
 
 connect('domino_bot_db')
 
@@ -11,6 +11,7 @@ class User(DynamicDocument):
     name = StringField(max_length=64, required=True, unique=True)
     admin = BooleanField(default=False)
     admin_level = IntField(default=0)
+    verified = BooleanField(default='False')
 
     def add_award(self, content):
 
@@ -41,6 +42,46 @@ class User(DynamicDocument):
         Points(**{'type': 'courses',
                   'content': content,
                   'owner': self}).save()
+
+    @classmethod
+    def get_users_verification_status(cls):
+        return {'verified_users': cls.objects(verified=True),
+                'not_verified_users': cls.objects(verified=False)}
+
+    def approve_user(self):
+
+        if not self.verified:
+
+            self.verified = True
+            self.save()
+
+            if self.verified:
+                return True
+
+            else:
+                # TODO Добавить логи
+                raise FatalException('Если это произошло срочно пишите вашему администратору')
+
+        else:
+            raise ValueError(f'{self.name} уже верифицирован')
+
+    def block_user(self):
+
+        if self.verified:
+
+            self.verified = False
+            self.save()
+
+            if not self.verified:
+                return True
+
+            else:
+                # TODO Добавить логи
+                raise FatalException('Если это произошло срочно пишите вашему администратору')
+
+        else:
+            raise ValueError(f'{self.name} уже заблокирован')
+
 
 class Points(DynamicDocument):
 
@@ -97,4 +138,3 @@ class Clients(Document):
 #
 # user = User.objects(name='Deny2s').first()
 # print(user.name)
-

@@ -10,6 +10,7 @@ class UserStates(Helper):
     ADMIN_BROADCAST = ListItem()
     WAIT_FOR_NAME = ListItem()
     WAIT_FOR_RESULT = ListItem()
+    WAIT_FOR_VERIFIED = ListItem()
 
 
 if __name__ == '__main__':

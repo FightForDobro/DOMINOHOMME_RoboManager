@@ -22,6 +22,7 @@ from keyboards import InlineKB
 from utils import UserStates, ListItem
 from messages import MESSAGES
 
+from random import choice
 import configparser
 #
 
@@ -55,7 +56,12 @@ async def process_start_command(message: types.Message):
                                 reply_markup=InlineKB().if_name_suit_btn(message.from_user.full_name)))]
 
     else:
-        await User(**get_user_data(message.from_user.id)).send_keyboard('main_menu')
+
+        if not db.User.objects(user_id=message.from_user.id).get().verified:
+            await bot.send_message(message.chat.id, 'Чтобы продолжить работу с ботом, напишите @DOMINOkaty')
+
+        else:
+            await User(**get_user_data(message.from_user.id)).send_keyboard('main_menu')
 
 @dp.message_handler(state='*', commands=['help'])
 async def process_help_command(message: types.Message):
@@ -158,16 +164,20 @@ async def catch_callback(call: types.CallbackQuery):
 
 class User:
 
-    def __init__(self, chat_id, user_id, name, admin=False):
+    def __init__(self, chat_id, user_id, name, admin=False, verified=False):
 
         self._chat_id = chat_id
         self._id = user_id
         self._name = name
         self._admin = admin
+        self._verified = verified
 
         self._state = dp.current_state(user=user_id)
 
     async def send_keyboard(self, keyboard: str):
+
+        if not await self.check_verification_status():
+            return
 
         if user_messages_to_delete.get(self._id, 0) == 0:
             user_messages_to_delete[self._id] = []
@@ -197,6 +207,9 @@ class User:
 
     async def show_user_sub_menu(self, menu_tittle):
 
+        if not await self.check_verification_status():
+            return
+
         await self.delete_old_messages()
         tittles_definitions = {'award': 'Премий', 'remind': 'Напоминаний', 'fine': 'Штрафов',
                                'task': 'Заданий', 'topics': 'Тем дня', 'training': 'Обучений'}
@@ -210,19 +223,20 @@ class User:
 
     async def register(self):
 
-        await self.delete_old_messages()
-
         try:
 
-            db.User(**{'user_id': self._id, 'chat_id': self._chat_id, 'name': self._name}).save()
-            await bot.send_message(self._chat_id, f'{self._name}, Добро пожаловать!🤘')
-            await self.send_keyboard('main_menu')
+            db.User(**{'user_id': self._id, 'chat_id': self._chat_id, 'name': self._name, 'verified': False}).save()
+            await bot.send_message(self._chat_id, f'{self._name}, Добро пожаловать!🤘\n'
+                                                  f'Напиши @DOMINOkaty чтобы продолжить работу с ботом')
+            await self._state.set_state('wait_for_verified')
 
         except NotUniqueError:
             user_messages_to_delete[self._id] = [(await bot.send_message(
                                                  self._chat_id, 'Это имя уже занято😥\n Попробуй другое'))]
 
     async def show_admin_sub_menu(self, data):
+
+        await self.check_verification_status()
 
         await self.delete_old_messages()
         await self._state.set_state(f'admin_{data}')
@@ -233,6 +247,10 @@ class User:
                                              reply_markup=getattr(InlineKB(), f'admin_{data}')()))]
 
     async def admin_add(self, data):
+
+        if not await self.check_verification_status():
+            return
+
         await self.delete_old_messages()
 
         if data.split('_')[0] == 'user':
@@ -248,12 +266,20 @@ class User:
                 reply_markup=InlineKB().get_user_buttons(db.User.objects(admin__ne=True))))]
 
     async def admin_broadcast(self):
+
+        if not await self.check_verification_status():
+            return
+
         await self.delete_old_messages()
         await self._state.set_state('admin_broadcast')
         user_messages_to_delete[self._id] = [(await bot.send_message(self._chat_id,
                                                                      'Напиши мне что-ты, хочешь сказать:'))]
 
     async def task_menu(self, data):
+
+        if not await self.check_verification_status():
+            return
+
         await self.delete_old_messages()
 
         point = db.Points.objects(id=data.split('_')[1]).get()
@@ -263,6 +289,10 @@ class User:
                                                                reply_markup=InlineKB('done_or_not', 2).generate_kb()))]
 
     async def in_task_menu(self, data):
+
+        if not await self.check_verification_status():
+            return
+
         await self.delete_old_messages()
 
         state_data = await self._state.get_data()
@@ -292,6 +322,16 @@ class User:
             except MessageToDeleteNotFound:  # Добавить сюда логи
                 print(user_messages_to_delete)
                 print(message)
+
+    async def check_verification_status(self):
+
+        if not self._verified:
+            jokes = [f'{self._name}, Я же попросил написать @DOMINOkaty',
+                     f'{self._name}, прекратите нажимать кнопки\n Лучшим решением будет написать @DOMINOkaty',
+                     f'{self._name}, Вам стоит написать @DOMINOkaty']
+
+            await bot.send_message(self._chat_id, choice(jokes))
+            return False
 # =====================================================================================================================#
 
 # ================================================== Utils ============================================================#
@@ -301,7 +341,8 @@ async def shutdown(dispatcher: Dispatcher):
 
 def get_user_data(user_id):
     user = db.User.objects(user_id=user_id).get()
-    return {'user_id': user_id, 'chat_id': user.chat_id, 'name': user.name, 'admin': user.admin}
+    return {'user_id': user_id, 'chat_id': user.chat_id, 'name': user.name,
+            'admin': user.admin, 'verified': user.verified}
 
 
 def get_birthdays():
@@ -309,11 +350,16 @@ def get_birthdays():
     birthday_boys = []
     for client in db.Clients.objects():
 
-        if client.birthday == 'нет':
-            continue
+        try:
+            if client.birthday == 'нет':
+                continue
 
-        elif client.birthday.month == datetime.now().date().month and client.birthday.day == datetime.now().day:
-            birthday_boys.append(f'{client.name}: {client.phone}\n')
+            elif client.birthday.month == datetime.now().date().month and client.birthday.day == datetime.now().day:
+                birthday_boys.append(f'{client.name}: {client.phone}\n')
+        except AttributeError:
+            print(client.id)
+            print(client.name)
+            print(client.birthday)
 
     if not birthday_boys:
         birthday_boys.append('Сегодня нет клиентов, у которых день рождения пора найти новых клиентов')
