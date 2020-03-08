@@ -7,6 +7,7 @@ class UserStates(Helper):
     MAIN_MENU = ListItem()
     ADMIN_MENU = ListItem()
     ADMIN_ADD = ListItem()
+    ADMIN_EDIT = ListItem()
     ADMIN_BROADCAST = ListItem()
     WAIT_FOR_NAME = ListItem()
     WAIT_FOR_RESULT = ListItem()

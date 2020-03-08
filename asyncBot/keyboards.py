@@ -40,7 +40,7 @@ class InlineKB(InlineKeyboardMarkup):
         self.add(InlineKeyboardButton('Хорошо👌', callback_data=f'{user_name}'))
         return self
 
-    def admin_add(self):
+    def admin_add(self):  # TODO Сделать одну функцию
 
         for button_data in self.PRESET['main_menu']:
             button_tittle, callback_data = button_data[0], button_data[1]
@@ -49,6 +49,17 @@ class InlineKB(InlineKeyboardMarkup):
         self.add(*self._buttons)
 
         return self
+
+    def admin_edit(self):
+
+        for button_data in self.PRESET['main_menu']:
+            button_tittle, callback_data = button_data[0], button_data[1]
+            self._buttons.append(InlineKeyboardButton(button_tittle, callback_data=f'edit_{callback_data}'))
+
+        self.add(*self._buttons)
+
+        return self
+
 
     def get_user_buttons(self, users):
 

@@ -23,6 +23,7 @@ from utils import UserStates, ListItem
 from messages import MESSAGES
 
 from random import choice
+import logging
 import configparser
 #
 
@@ -32,7 +33,8 @@ user_messages_to_delete = {}
 
 # ========================================= Config Sections ===========================================================#
 logging.basicConfig(format=u'%(filename)s [ LINE:%(lineno)+3s ]#%(levelname)+8s [%(asctime)s]  %(message)s',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
+log = logging.getLogger('broadcast')
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -81,7 +83,7 @@ async def register(message):
         print(f'Type: {type(message)} not correct\n Possible types: {types.Message} and {types.CallbackQuery}')
 
 
-@dp.message_handler(state='*')
+@dp.message_handler(state='*', content_types=ContentType.ANY)
 async def catch_user_input(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
 
@@ -96,7 +98,17 @@ async def catch_user_input(message: types.Message):
         users = db.User.objects()
 
         for user in users:
-            await bot.send_message(user.chat_id, message.text)
+
+            if message.photo:
+                photo = await message.photo[-1].get_url()
+                await bot.send_photo(user.chat_id, types.InputFile.from_url(photo), message.caption)
+
+            elif message.text:
+                await bot.send_message(user.chat_id, message.text)
+
+            else:
+                log.info(f'STATUS: Error | USER: {message.from_user.id} | ACTION: Broadcast | Exception: Not Valid Type'
+                         f'| Message Type: {type(message)}')
 
         await User(**get_user_data(message.from_user.id)).send_keyboard('main_menu')
 
@@ -131,9 +143,6 @@ async def catch_callback(call: types.CallbackQuery):
         await bot.answer_callback_query(call.id)
         await User(**get_user_data(call.from_user.id)).in_task_menu(call.data)
 
-    elif call.data == 'edit':
-        await call.answer('Under construction', True)
-
     elif call.data == 'broadcast':
         await bot.answer_callback_query(call.id)
         await User(**get_user_data(call.from_user.id)).admin_broadcast()
@@ -145,6 +154,11 @@ async def catch_callback(call: types.CallbackQuery):
     elif 'admin_add' in await state.get_state():
         await bot.answer_callback_query(call.id)
         await User(**get_user_data(call.from_user.id)).admin_add(call.data)
+
+    elif call.data.split('_')[0] == 'edit':
+        await bot.answer_callback_query(call.id)
+        if call.data.split('_')[1] == 'topics':
+            await bot.send_message('Напиши мне новую тему дня:')
 
     elif call.data in ['award', 'remind', 'task', 'topics', 'training', 'fine']:
         await bot.answer_callback_query(call.id)
@@ -236,7 +250,8 @@ class User:
 
     async def show_admin_sub_menu(self, data):
 
-        await self.check_verification_status()
+        if not await self.check_verification_status():
+            return
 
         await self.delete_old_messages()
         await self._state.set_state(f'admin_{data}')
@@ -245,6 +260,16 @@ class User:
 
         user_messages_to_delete[self._id] = [(await bot.send_message(self._chat_id, moves[data],
                                              reply_markup=getattr(InlineKB(), f'admin_{data}')()))]
+
+    async def admin_edit(self, data):
+
+        if not await self.check_verification_status():
+            return
+
+        await self.delete_old_messages()
+
+        user_messages_to_delete[self._id] = [(await bot.send_message(self._chat_id, 'Изменить 🖊',
+                                                                     reply_markup=InlineKB('main_menu').generate_kb()))]
 
     async def admin_add(self, data):
 
@@ -264,6 +289,14 @@ class User:
             user_messages_to_delete[self._id] = [(await bot.send_message(
                 self._chat_id, 'Выбери консультанта:',
                 reply_markup=InlineKB().get_user_buttons(db.User.objects(admin__ne=True))))]
+
+    async def edit_topic(self):
+
+        if not await self.check_verification_status():
+            return
+
+        await self.delete_old_messages()
+        await self._state.set_state('admin_edit_topic')
 
     async def admin_broadcast(self):
 
@@ -332,6 +365,8 @@ class User:
 
             await bot.send_message(self._chat_id, choice(jokes))
             return False
+
+        return True
 # =====================================================================================================================#
 
 # ================================================== Utils ============================================================#
